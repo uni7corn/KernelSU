@@ -1,12 +1,24 @@
 # Guias de módulo
 
-O KernelSU fornece um mecanismo de módulo que consegue modificar o diretório do sistema enquanto mantém a integridade da partição do sistema. Este mecanismo é conhecido como "sem sistema".
+O KernelSU fornece um mecanismo de módulo que consegue modificar o diretório do sistema enquanto mantém a integridade da partição do sistema. Esse mecanismo é conhecido como "sem sistema".
 
-O mecanismo de módulos do KernelSU é quase o mesmo do Magisk. Se você está familiarizado com o desenvolvimento de módulos Magisk, o desenvolvimento de módulos KernelSU é muito semelhante. Você pode pular a introdução dos módulos abaixo e só precisa ler [Diferença com Magisk](difference-with-magisk.md).
+O mecanismo de módulos do KernelSU é quase o mesmo do Magisk. Se você já está familiarizado com o desenvolvimento de módulos Magisk, o desenvolvimento de módulos KernelSU é muito semelhante. Você pode pular a introdução dos módulos abaixo e só precisa ler [Diferenças com Magisk](difference-with-magisk.md).
+
+::: warning METAMODULE NECESSÁRIO APENAS PARA MODIFICAÇÃO DE ARQUIVOS DO SISTEMA
+KernelSU usa uma arquitetura [metamodule](metamodule.md) para montar o diretório `system`. **Somente se seu módulo precisar modificar arquivos `/system`** (via diretório `system`), você precisa instalar um metamodule (como [meta-overlayfs](https://github.com/tiann/KernelSU/releases)). Outros recursos de módulos como scripts, regras sepolicy e system.prop funcionam sem um metamodule.
+:::
 
 ## WebUI
 
-Os módulos do KernelSU suportam a exibição de interfaces e a interação com os usuários, consulte a [documentação do WebUI](module-webui.md).
+Os módulos do KernelSU suportam a exibição de interfaces e a interação com os usuários. Para mais detalhes, consulte a [documentação do WebUI](module-webui.md).
+
+## Configuração de Módulo
+
+O KernelSU fornece um sistema de configuração integrado que permite que os módulos armazenem configurações de chave-valor persistentes ou temporárias. Para mais detalhes, consulte a [documentação de Configuração de Módulo](module-config.md).
+
+## Scripts de execução única
+
+Um ZIP de módulo também pode ser um script de execução única, que o gerenciador do KernelSU executa uma vez em vez de instalar. Para mais detalhes, consulte a [documentação de Scripts de Execução Única](module-script.md).
 
 ## BusyBox
 
@@ -21,8 +33,7 @@ Para aqueles que desejam usar o recurso Modo Autônomo fora do KernelSU, existem
 
 Para garantir que todos os shells `sh` subsequentes executados também sejam executados no Modo Autônomo, a opção 1 é o método preferido (e é isso que o KernelSU e o gerenciador do KernelSU usam internamente), pois as variáveis ​​de ambiente são herdadas para os subprocesso.
 
-::: tip DIFERENÇA COM MAGISK
-
+::: tip DIFERENÇAS COM MAGISK
 O BusyBox do KernelSU agora está usando o arquivo binário compilado diretamente do projeto Magisk. **Obrigado ao Magisk!** Portanto, você não precisa se preocupar com problemas de compatibilidade entre scripts BusyBox no Magisk e KernelSU porque eles são exatamente iguais!
 :::
 
@@ -61,8 +72,12 @@ Um módulo KernelSU é uma pasta colocada em `/data/adb/modules` com a estrutura
 │   ├── service.sh          <--- Este script será executado no serviço late_start
 │   ├── boot-completed.sh   <--- Este script será executado na inicialização concluída
 |   ├── uninstall.sh        <--- Este script será executado quando o KernelSU remover seu módulo
+|   ├── action.sh           <--- Este script será executado quando o usuário clicar no botão Ação no KernelSU
 │   ├── system.prop         <--- As propriedades neste arquivo serão carregadas como propriedades do sistema por resetprop
 │   ├── sepolicy.rule       <--- Regras adicionais do sepolicy personalizadas
+│   ├── initrc/             <--- Arquivos .rc neste diretório serão injetados no init.rc no boot
+│   │   ├── myservice.rc
+│   │   └── ...
 │   │
 │   │      *** Gerado automaticamente, NÃO CRIE OU MODIFIQUE MANUALMENTE ***
 │   │
@@ -82,7 +97,7 @@ Um módulo KernelSU é uma pasta colocada em `/data/adb/modules` com a estrutura
 ├── .
 ```
 
-::: tip DIFERENÇA COM MAGISK
+::: tip DIFERENÇAS COM MAGISK
 O KernelSU não possui suporte integrado para o Zygisk, portanto não há conteúdo relacionado ao Zygisk no módulo. No entanto, você pode usar [ZygiskNext](https://github.com/Dr-TSNG/ZygiskNext) para suportar módulos Zygisk. Neste caso, o conteúdo do módulo Zygisk é idêntico ao suportado pelo Magisk.
 :::
 
@@ -97,6 +112,9 @@ version=<string>
 versionCode=<int>
 author=<string>
 description=<string>
+updateJson=<url> (opcional)
+actionIcon=<path> (opcional)
+webuiIcon=<path> (opcional)
 ```
 
 - `id` deve corresponder a esta expressão regular: `^[a-zA-Z][a-zA-Z0-9._-]+$`<br>
@@ -105,6 +123,14 @@ description=<string>
 - `versionCode` deve ser um **número inteiro**. Isso é usado para comparar versões.
 - Outros que não foram mencionados acima podem ser qualquer string de **linha única**.
 - Certifique-se de usar o tipo de quebra de linha `UNIX (LF)` e não o `Windows (CR+LF)` ou `Macintosh (CR)`.
+- `actionIcon` e `webuiIcon` são caminhos de imagem opcionais usados como ícones
+  padrão para o atalho de ação do módulo e o atalho WebUI do módulo no
+  aplicativo gerenciador. Esses caminhos devem ser relativos ao diretório raiz do módulo.
+  Por exemplo, `actionIcon=icon/icon.png` será resolvido como `<MODDIR>/icon/icon.png`.
+
+::: tip DESCRIÇÃO DINÂMICA
+O campo `description` pode ser substituído dinamicamente em tempo de execução usando o sistema de configuração de módulos. Veja [Substituindo a Descrição do Módulo](module-config.md#overriding-module-description) para detalhes.
+:::
 
 ### Shell scripts
 
@@ -112,7 +138,7 @@ Por favor, leia a seção [Scripts de inicialização](#scripts-de-inicializacao
 
 Em todos os scripts do seu módulo, use `MODDIR=${0%/*}` para obter o caminho do diretório base do seu módulo, **NÃO** codifique o caminho do seu módulo nos scripts.
 
-::: tip DIFERENÇA COM MAGISK
+::: tip DIFERENÇAS COM MAGISK
 Você pode usar a variável de ambiente `KSU` para determinar se um script está sendo executado no KernelSU ou Magisk. Se estiver executando no KernelSU, esse valor será definido como `true`.
 :::
 
@@ -149,9 +175,8 @@ REPLACE="
 
 Esta lista criará automaticamente os diretórios `$MODPATH/system/app/YouTube` e `$MODPATH/system/app/Bloatware` e, em seguida, executará `setfattr -n trusted.overlay.opaque -v y $MODPATH/system/app/YouTube` e `setfattr -n trusted.overlay.opaque -v y $MODPATH/system/app/Bloatware`. Após o módulo entrar em vigor, `/system/app/YouTube` e `/system/app/Bloatware` serão substituídos por diretórios vazios.
 
-::: tip DIFERENÇA COM MAGISK
-
-O mecanismo sem sistema do KernelSU é implementado através do OverlayFS do kernel, enquanto o Magisk atualmente usa montagem mágica (montagem de ligação). Os dois métodos de implementação têm diferenças significativas, mas o objetivo final é o mesmo: modificar os arquivos /system sem modificar fisicamente a partição /system.
+::: tip DIFERENÇAS COM MAGISK
+O mecanismo sem sistema do KernelSU é implementado através do OverlayFS do kernel, enquanto o Magisk atualmente usa montagem mágica (montagem de ligação). Os dois métodos de implementação têm diferenças significativas, mas o objetivo final é o mesmo: modificar os arquivos `/system` sem modificar fisicamente a partição `/system`.
 :::
 
 Se você estiver interessado em OverlayFS, é recomendável ler a [documentação sobre OverlayFS](https://docs.kernel.org/filesystems/overlayfs.html) do kernel Linux.
@@ -163,6 +188,80 @@ Este arquivo segue o mesmo formato de `build.prop`. Cada linha é composta por `
 ### sepolicy.rule
 
 Se o seu módulo exigir alguns patches adicionais do sepolicy, adicione essas regras a este arquivo. Cada linha neste arquivo será tratada como uma declaração de política.
+
+### Injeção de initrc {#initrc-injection}
+
+O KernelSU fornece um mecanismo para injetar diretivas RC customizadas do Android Init no `init.rc` do sistema. Isso permite que os módulos registrem serviços Android customizados, definam gatilhos de propriedade ou executem outras ações de linguagem Init sem modificar a partição do sistema.
+
+Durante a inicialização, o módulo do kernel KernelSU intercepta as chamadas de sistema `read()` e `fstat()`. Quando o processo init do Android lê `/system/etc/init/hw/init.rc`, o KernelSU adiciona de forma transparente o conteúdo RC customizado ao final do arquivo. O processo init analisa essas diretivas injetadas exatamente como o conteúdo original do init.rc.
+
+No lado do espaço do usuário, o ksud concatena todos os arquivos `.rc` de módulos habilitados em um único arquivo `modules.rc`, armazenado na partição `/metadata`. Este arquivo é regenerado automaticamente sempre que o estado de um módulo muda (instalar, habilitar, desabilitar, desinstalar, etc.).
+
+#### Arquivos initrc do módulo
+
+Crie um subdiretório `initrc/` no diretório do seu módulo e coloque seus arquivos `.rc` lá:
+
+```txt
+/data/adb/modules/<MODID>/
+├── initrc/
+│   ├── myservice.rc
+│   └── another.rc
+└── ...
+```
+
+::: tip
+- Os arquivos devem ter uma extensão `.rc`.
+- Contanto que o módulo esteja habilitado, todos os arquivos `.rc` no diretório `initrc/` serão incluídos (permissão de execução não é necessária).
+- Os arquivos são processados em **ordem alfabética de nome de arquivo** dentro do diretório, e os módulos são processados em **ordem alfabética de ID do módulo**.
+:::
+
+#### Arquivos initrc gerais
+
+Além de arquivos RC no nível do módulo, você pode colocar arquivos `.rc` no diretório global:
+
+```txt
+/data/adb/initrc.d/
+├── myservice.rc
+└── another.rc
+```
+
+::: warning Arquivos initrc gerais requerem permissão de execução
+Diferente do diretório `initrc/` do módulo, arquivos em `/data/adb/initrc.d/` **devem ter permissões de execução** para serem incluídos. Arquivos `.rc` não executáveis serão ignorados silenciosamente.
+:::
+
+Arquivos `initrc.d/` gerais são processados antes de quaisquer arquivos RC de módulo.
+
+#### Exemplo
+
+Aqui está um exemplo de arquivo `.rc` que registra um serviço Android customizado:
+
+```rc
+service myservice /data/adb/modules/mymodule/bin/myservice
+    user root
+    group root
+    disabled
+    seclabel u:r:ksu:s0
+
+on property:sys.boot_completed=1
+    start myservice
+```
+
+Se este arquivo for colocado em `/data/adb/modules/mymodule/initrc/myservice.rc`, ele registrará um serviço chamado `myservice` na inicialização e o iniciará quando `sys.boot_completed=1` for alcançado.
+
+#### Atualização Manual
+
+Você pode acionar manualmente a regeneração do `modules.rc` com o seguinte comando (as alterações entram em vigor na próxima inicialização):
+
+```sh
+ksud initrc refresh
+```
+
+::: tip
+- A injeção de initrc acontece extremamente cedo no processo de inicialização (quando o init lê o init.rc), **antes** do post-fs-data e de quaisquer scripts de módulo serem executados.
+- O conteúdo RC injetado é tratado pelo init como parte do init.rc original, suportando toda a sintaxe da linguagem Android Init (definições de serviço, gatilhos, configurações de propriedades, etc.).
+- A injeção de initrc **não está disponível** no **modo late-load**, pois os ganchos de chamada do sistema não são instalados nesse modo.
+- A injeção de RC do módulo pode ser desabilitada passando o parâmetro `--no-custom-rc` ao aplicar patch na imagem com o ksud.
+:::
 
 ## Instalador do módulo
 
@@ -184,7 +283,7 @@ O módulo KernelSU **NÃO** é compatível para instalação no Recovery persona
 
 ### Personalização
 
-Se você precisar personalizar o processo de instalação do módulo, opcionalmente você pode criar um script no instalador chamado `customize.sh`. Este script será **sourced** (não executado) pelo script do instalador do módulo depois que todos os arquivos forem extraídos e as permissões padrão e o contexto secundário forem aplicados. Isso é muito útil se o seu módulo exigir configuração adicional com base na API do dispositivo ou se você precisar definir permissões/secontext especiais para alguns dos arquivos do seu módulo.
+Se você precisar personalizar o processo de instalação do módulo, opcionalmente você pode criar um script no instalador chamado `customize.sh`. Este script será **sourced** (não executado) pelo script do instalador do módulo depois que todos os arquivos forem extraídos e as permissões padrão e o contexto secundário forem aplicados. Isso é muito útil se o seu módulo exigir configuração adicional com base na ABI do dispositivo ou se você precisar definir permissões/secontext especiais para alguns dos arquivos do seu módulo.
 
 Se você quiser controlar e personalizar totalmente o processo de instalação, declare `SKIPUNZIP=1` em `customize.sh` para pular todas as etapas de instalação padrão. Ao fazer isso, seu `customize.sh` será responsável por instalar tudo sozinho.
 
@@ -193,16 +292,19 @@ O script `customize.sh` é executado no shell BusyBox `ash` do KernelSU com o Mo
 #### Variáveis
 
 - `KSU` (bool): uma variável para marcar que o script está sendo executado no ambiente KernelSU, e o valor desta variável sempre será `true`. Você pode usá-lo para distinguir entre KernelSU e Magisk.
-- `KSU_VER` (string): a string da versão do KernelSU atualmente instalado (por exemplo: `v0.4.0`).
-- `KSU_VER_CODE` (int): o código da versão do KernelSU atualmente instalado no espaço do usuário (por exemplo: `10672`).
-- `KSU_KERNEL_VER_CODE` (int): o código da versão do KernelSU atualmente instalado no espaço do kernel (por exemplo: `10672`).
+- `KSU_VER` (string): a string da versão do KernelSU atualmente instalado (ex.: `v0.4.0`).
+- `KSU_VER_CODE` (int): o código da versão do KernelSU atualmente instalado no espaço do usuário (ex.: `10672`).
+- `KSU_KERNEL_VER_CODE` (int): o código da versão do KernelSU atualmente instalado no espaço do kernel (ex.: `10672`).
 - `BOOTMODE` (bool): sempre será `true` no KernelSU.
 - `MODPATH` (path): o caminho onde os arquivos do seu módulo devem ser instalados.
 - `TMPDIR` (path): um lugar onde você pode armazenar arquivos temporariamente.
 - `ZIPFILE` (path): ZIP de instalação do seu módulo.
 - `ARCH` (string): a arquitetura da CPU do dispositivo. O valor é `arm`, `arm64`, `x86` ou `x64`.
 - `IS64BIT` (bool): `true` se `$ARCH` for `arm64` ou `x64`.
-- `API` (int): o nível da API (versão do Android) do dispositivo (por exemplo: `23` para Android 6.0).
+- `API` (int): o nível da API (versão do Android) do dispositivo (ex.: `23` para Android 6.0).
+- `KSU_UAPI_VER` (int): a versão UAPI do espaço do usuário do KernelSU (ksud) (ex.: `2`). Esta versão é incrementada quando há alterações que quebram a compatibilidade no driver do kernel, e pode ser usada pelos módulos para verificar compatibilidade.
+- `KSU_RUNTIME_MODE` (string): o modo de execução atual do KernelSU. Os valores possíveis são `built-in` (modo GKI, compilado no kernel), `lkm` (carregado como módulo do kernel na inicialização) ou `late-load` (carregado como módulo do kernel após a inicialização).
+- `KSU_LATE_LOAD` (int?): se o KernelSU foi carregado tardiamente após a inicialização, esta variável é definida como `1`; caso contrário, não é definida.
 
 ::: warning AVISO
 No KernelSU, `MAGISK_VER_CODE` é sempre `25200` e `MAGISK_VER` é sempre `v25.2`. Por favor, não use essas duas variáveis ​​para determinar se ele está sendo executado no KernelSU ou não.
@@ -230,25 +332,25 @@ set_perm_recursive <directory> <owner> <group> <dirpermission> <filepermission> 
     se [context] não está definido, o padrão é "u:object_r:system_file:s0"
     para todos os arquivos em <directory>, ele chamará:
        set_perm arquivo proprietário do grupo filepermission
-    para todos os diretórios em <directory> (including itself), ele vai ligar:
+    para todos os diretórios em <directory> (incluindo ele mesmo), ele vai ligar:
        set_perm dir owner group dirpermission context
 ```
 
 ## Scripts de inicialização
 
-No KernelSU, os scripts são divididos em dois tipos com base em seu modo de execução: modo post-fs-data e modo de serviço late_start:
+No KernelSU, os scripts são divididos em dois tipos com base em seu modo de execução: modo post-fs-data e modo de serviço late_start.
 
 - modo post-fs-data
-  - Esta etapa está BLOQUEANDO. O processo de inicialização é pausado antes da execução ser concluída ou 10 segundos se passaram.
+  - Esta etapa está BLOQUEANDO. O processo de inicialização é pausado antes da conclusão da execução ou após 10 segundos.
   - Os scripts são executados antes de qualquer módulo ser montado. Isso permite que um desenvolvedor de módulo ajuste dinamicamente seus módulos antes de serem montados.
   - Este estágio acontece antes do início do Zygote, o que significa praticamente tudo no Android.
   - **AVISO:** Usar `setprop` irá bloquear o processo de inicialização! Por favor, use `resetprop -n <prop_name> <prop_value>` em vez disso.
-  - **Execute scripts neste modo apenas se necessário.**
+  - **Execute scripts neste modo apenas se necessário**.
 - modo de serviço late_start
   - Esta etapa é SEM BLOQUEIO. Seu script é executado em paralelo com o restante do processo de inicialização.
   - **Este é o estágio recomendado para executar a maioria dos scripts**.
 
-No KernelSU, os scripts de inicialização são divididos em dois tipos com base no local de armazenamento: scripts gerais e scripts de módulo:
+No KernelSU, os scripts de inicialização são divididos em dois tipos com base no local de armazenamento: scripts gerais e scripts de módulo.
 
 - Scripts gerais
   - Colocado em `/data/adb/post-fs-data.d`, `/data/adb/service.d`, `/data/adb/post-mount.d` ou `/data/adb/boot-completed.d`.
@@ -261,3 +363,136 @@ No KernelSU, os scripts de inicialização são divididos em dois tipos com base
   - `post-fs-data.sh` é executado no modo post-fs-data, `service.sh` é executado no modo de serviço late_start, `boot-completed.sh` é executado na inicialização concluída e `post-mount.sh` é executado no OverlayFS montado.
 
 Todos os scripts de inicialização serão executados no shell BusyBox `ash` do KernelSU com o Modo Autônomo ativado.
+
+### Explicação do processo de scripts de inicialização
+
+A seguir está o processo de inicialização relevante para o Android (algumas partes foram omitidas), que inclui a operação do KernelSU (com asteriscos iniciais) e pode ajudá-lo a entender melhor o propósito desses scripts de módulo:
+
+```txt
+0. Bootloader (nada nesta tela)
+load patched boot.img
+load kernel:
+    - Modo GKI: kernel GKI com KernelSU integrado
+    - Modo LKM: kernel stock
+...
+
+1. kernel exec init (logo OEM na tela):
+    - Modo GKI: stock init
+    - Modo LKM: exec ksuinit, insmod kernelsu.ko, exec stock init
+mount /dev, /dev/pts, /proc, /sys, etc.
+property-init -> read default props
+read init.rc
+  *initrc injection: Kernel hook appends KernelSU core RC and module modules.rc to init.rc
+...
+early-init -> init -> late_init
+early-fs
+   start vold
+fs
+  mount /vendor, /system, /persist, etc.
+post-fs-data
+  *verificação do modo de segurança
+  *executar scripts gerais em post-fs-data.d/
+  *carregar sepolicy.rule
+  *montar tmpfs
+  *executar scripts de módulo post-fs-data.sh
+    **(Zygisk)./bin/zygisk-ptrace64 monitor
+  *(pré)carregamento de system.prop (igual a resetprop -n)
+  *remontar módulos em /system
+  *executar scripts gerais em post-mount.d/
+  *executar scripts de módulo post-mount.sh
+zygote-start
+load_all_props_action
+  *executar resetprop (defina adereços reais para resetprop com a opção -n)
+... -> boot
+  class_start core
+    start-service logd, console, vold, etc.
+  class_start main
+    start-service adb, netd (iptables), zygote, etc.
+
+2. kernel2user init (animação da ROM na tela, inicie pelo serviço bootanim)
+*executar scripts gerais em service.d/
+*executar scripts de módulo service.sh
+*definir adereços para resetprop sem a opção -p
+  **(Zygisk) hook zygote (iniciar o zygiskd)
+  **(Zygisk) montar zygisksu/module.prop
+iniciar apps do sistema (início automático)
+...
+inicialização completa (transmitir evento ACTION_BOOT_COMPLETED)
+*executar scripts gerais em boot-completed.d/
+*executar scripts de módulo boot-completed.sh
+
+3. Operável pelo usuário (tela de bloqueio)
+insira a senha para descriptografar /data/data
+*conjunto real de adereços para resetprop com opção -p
+iniciar apps de usuário (início automático)
+```
+
+Se você estiver interessado na linguagem de inicialização do Android, é recomendável ler sua [documentação](https://android.googlesource.com/platform/system/core/+/master/init/README.md).
+
+## Modo late-load {#late-load-mode}
+
+Além do fluxo de inicialização padrão descrito acima, o KernelSU suporta um **modo late-load** para cenários de LKM (Loadable Kernel Module). Neste modo, o módulo do kernel KernelSU é carregado **após o sistema ter sido totalmente iniciado**, em vez de durante o processo init.
+
+### Quando o late-load acontece?
+
+O late-load é acionado executando o comando `ksud late-load`. Este comando:
+
+1. Detecta a versão KMI atual e carrega o `kernelsu.ko` correspondente dos recursos incorporados.
+2. Realiza a inicialização do módulo (regras SELinux, lista de permissões, features, etc.) que normalmente aconteceria durante a inicialização.
+
+Como o sistema já está totalmente em execução, certos mecanismos de tempo de inicialização estão indisponíveis ou são desnecessários.
+
+### Diferenças em relação à inicialização padrão
+
+| Comportamento | Inicialização padrão | Modo late-load |
+|---------------|:---:|:---:|
+| Módulo do kernel carregado pelo init (PID 1) | Sim | Não (carregado após inicialização) |
+| Hooks kprobe do ksud (execve/read/fstat/input) | Sim | Ignorado |
+| Detecção de modo seguro (tecla de volume) | Sim | Sempre desativado |
+| Captura de log de inicialização (logcat/dmesg) | Sim | Ignorado |
+| Verificação de coexistência com Magisk | Sim | Ignorado |
+| Evento `post-fs-data` reportado ao kernel | Sim | Ignorado |
+| Evento `boot-completed` reportado ao kernel | Sim | Definido diretamente durante init |
+| Scripts `post-fs-data.sh` / `post-fs-data.d/` | Sim | Substituído pelo estágio `late-load` |
+| Carregamento de `system.prop` | Sim | Sim |
+| Montagem OverlayFS (metamodule) | Sim | Sim |
+| Scripts `post-mount.sh` / `post-mount.d/` | Sim | Sim |
+| Scripts `service.sh` / `service.d/` | Sim | Sim |
+| Scripts `boot-completed.sh` / `boot-completed.d/` | Sim | Sim |
+| Variável de ambiente `KSU_LATE_LOAD` | Não definida | Definida como `1` |
+| Flag de info do kernel `0x4` | Não definida | Definida |
+
+### Ordem de execução dos scripts
+
+No modo late-load, a ordem de execução dos scripts é:
+
+```txt
+ksud late-load:
+  1. Carregar kernelsu.ko (se ainda não carregado)
+  2. Extrair binários, processar atualizações de módulos, carregar regras SELinux, inicializar features
+  3. Executar scripts late-load.d/ e scripts late-load dos módulos (bloqueante)
+  4. Carregar system.prop (resetprop -n)
+  5. Executar script de montagem do metamodule (OverlayFS)
+  6. Executar scripts post-mount.d/ e post-mount.sh dos módulos (bloqueante)
+  7. Executar scripts service.d/ e service.sh dos módulos (não bloqueante)
+  8. Executar scripts boot-completed.d/ e boot-completed.sh dos módulos (não bloqueante)
+```
+
+### Scripts específicos do late-load
+
+Módulos podem fornecer um script `late-load.sh` que é executado **apenas** no modo late-load, como substituto do `post-fs-data.sh`. Este script é executado antes da montagem do OverlayFS, similar ao `post-fs-data.sh` no fluxo padrão.
+
+Além disso, scripts gerais podem ser colocados em `/data/adb/late-load.d/` para serem executados neste estágio.
+
+### Detectando o modo late-load nos scripts
+
+Módulos podem detectar o modo late-load verificando a variável de ambiente `KSU_LATE_LOAD`:
+
+```sh
+if [ "$KSU_LATE_LOAD" = "1" ]; then
+    # Executando no modo late-load
+    echo "Late-load mode detected"
+fi
+```
+
+Isso permite que os módulos ajustem seu comportamento de acordo, por exemplo, pulando operações que só são necessárias durante a inicialização antecipada.

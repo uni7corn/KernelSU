@@ -23,7 +23,7 @@ export default defineConfig({
 
     footer: {
       message: 'GPL3 ライセンスでリリースされています。',
-      copyright: 'Copyright © 2022-現在 KernelSU 開発者'
+      copyright: 'Copyright © 2022-現在 KernelSU 開発者。'
     },
 
     editLink: {
@@ -50,7 +50,11 @@ function sidebarGuide() {
         { text: '非 GKI デバイスでの実装', link: '/ja_JP/guide/how-to-integrate-for-non-gki' },
         { text: '非公式の対応デバイス', link: '/ja_JP/guide/unofficially-support-devices.md' },
         { text: 'モジュールのガイド', link: '/ja_JP/guide/module.md' },
+        { text: 'メタモジュール', link: '/ja_JP/guide/metamodule.md' },
+        { text: 'モジュール設定', link: '/ja_JP/guide/module-config.md' },
+        { text: 'ワンショットスクリプト', link: '/ja_JP/guide/module-script.md' },
         { text: 'ブートループからの復旧', link: '/ja_JP/guide/rescue-from-bootloop.md' },
+        { text: 'x86_64 サポート', link: '/ja_JP/guide/x86_64-support' },
         { text: 'よくある質問', link: '/ja_JP/guide/faq' },
         { text: '隠し機能', link: '/ja_JP/guide/hidden-features' },
       ]

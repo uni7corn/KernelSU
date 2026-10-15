@@ -23,7 +23,7 @@ export default defineConfig({
 
     footer: {
         message: 'Phát hành dưới giấy phép GPL3.',
-        copyright: 'Bản Quyền © 2022-nay KernelSU Developers'
+        copyright: 'Bản Quyền © 2022-nay KernelSU developers.'
     },
 
     editLink: {
@@ -49,6 +49,10 @@ function sidebarGuide() {
           { text: 'Cách để build?', link: '/vi_VN/guide/how-to-build' },
           { text: 'Tích hợp vào thiết bị không sử dụng GKI', link: '/vi_VN/guide/how-to-integrate-for-non-gki'},
           { text: 'Thiết bị hỗ trợ không chính thức', link: '/vi_VN/guide/unofficially-support-devices.md' },
+          { text: 'Metamodule', link: '/vi_VN/guide/metamodule.md' },
+          { text: 'Cấu hình module', link: '/vi_VN/guide/module-config.md' },
+          { text: 'Script chạy một lần', link: '/vi_VN/guide/module-script.md' },
+          { text: 'Hỗ trợ x86_64', link: '/vi_VN/guide/x86_64-support' },
           { text: 'FAQ - Câu hỏi thường gặp', link: '/vi_VN/guide/faq' },
         ]
     }
